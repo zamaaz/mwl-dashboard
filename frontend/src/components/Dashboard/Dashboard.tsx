@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
 import { ArrowLeft } from 'lucide-react';
 import { KpiGrid } from './KpiGrid';
 import { SCurveChart } from './SCurveChart';
