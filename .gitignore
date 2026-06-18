@@ -1,0 +1,15 @@
+node_modules/
+.env
+dist/
+build/
+.DS_Store
+
+# SQLite Database
+backend/database/*.db
+backend/database/*.db-journal
+backend/database/*.db-wal
+backend/database/*.db-shm
+
+# Uploaded Files
+backend/storage/uploads/*
+!backend/storage/uploads/.gitkeep

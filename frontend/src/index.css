@@ -1,0 +1,86 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+  --font-heading: 'Lora', Georgia, 'Times New Roman', serif;
+  --font-mono: 'JetBrains Mono', monospace;
+
+  --color-border: hsl(220 13% 90%);
+  --color-input: hsl(220 13% 90%);
+  --color-ring: hsl(216 50% 36%);
+  --color-background: hsl(40 10% 98%);
+  --color-foreground: hsl(220 20% 14%);
+
+  --color-primary: hsl(216 50% 36%);
+  --color-primary-foreground: hsl(0 0% 100%);
+
+  --color-secondary: hsl(220 14% 95%);
+  --color-secondary-foreground: hsl(220 20% 14%);
+
+  --color-destructive: hsl(4 68% 56%);
+  --color-destructive-foreground: hsl(0 0% 100%);
+
+  --color-muted: hsl(220 14% 95%);
+  --color-muted-foreground: hsl(220 8% 50%);
+
+  --color-accent: hsl(216 50% 36%);
+  --color-accent-foreground: hsl(0 0% 100%);
+
+  --color-popover: hsl(0 0% 100%);
+  --color-popover-foreground: hsl(220 20% 14%);
+
+  --color-card: hsl(0 0% 100%);
+  --color-card-foreground: hsl(220 20% 14%);
+
+  --color-success: hsl(104 52% 38%);
+  --color-success-foreground: hsl(0 0% 100%);
+
+  --color-warning: hsl(36 85% 42%);
+  --color-warning-foreground: hsl(0 0% 100%);
+
+  --color-info: hsl(199 80% 42%);
+  --color-info-foreground: hsl(0 0% 100%);
+
+  --radius-lg: 6px;
+  --radius-md: 4px;
+  --radius-sm: 2px;
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+    font-feature-settings: "rlig" 1, "calt" 1;
+    -webkit-font-smoothing: antialiased;
+}
+
+@media print {
+  body {
+    background-color: white !important;
+  }
+  
+  /* Hide the dropdown and UI buttons when printing */
+  select, button, header p {
+    display: none !important;
+  }
+  
+  /* Remove scrollbars from tables and timeline for printing */
+  .overflow-x-auto, .overflow-y-auto {
+    overflow: visible !important;
+    max-height: none !important;
+  }
+  
+  /* Adjust layout to fit A4 paper */
+  main {
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+  
+  /* Force background colors to print */
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+}
