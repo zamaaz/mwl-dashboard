@@ -41,8 +41,9 @@ export const Dashboard: React.FC = () => {
 
   useEffect(() => {
     // Fetch available periods
-    axios.get('http://localhost:3001/api/projects/1/reports')
-      .then(res => setPeriods(res.data))
+    fetch('/api/projects/1/reports')
+      .then(res => res.json())
+      .then(data => setPeriods(data))
       .catch(() => {});
   }, []);
 
@@ -51,12 +52,17 @@ export const Dashboard: React.FC = () => {
       try {
         setLoading(true);
         const url = selectedPeriod
-          ? `http://localhost:3001/api/reports/${selectedPeriod}`
-          : 'http://localhost:3001/api/projects/1/reports/latest';
-        const response = await axios.get(url);
-        setSnapshot(response.data);
+          ? `/api/reports/${selectedPeriod}`
+          : '/api/projects/1/reports/latest';
+        const response = await fetch(url);
+        if (!response.ok) {
+           const errData = await response.json().catch(() => ({}));
+           throw new Error(errData.error || 'Failed to load dashboard data');
+        }
+        const data = await response.json();
+        setSnapshot(data);
       } catch (err: any) {
-        setError(err.response?.data?.error || 'Failed to load dashboard data');
+        setError(err.message || 'Failed to load dashboard data');
       } finally {
         setLoading(false);
       }
