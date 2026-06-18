@@ -2,7 +2,7 @@ import { Router, Response } from 'express';
 import multer from 'multer';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { getDb, dbGet, dbAll, dbRun } from '../database.js';
+import { dbGet, dbAll, dbRun } from '../database.js';
 import { AuthRequest, authMiddleware, adminOnly } from '../middleware/auth.js';
 import { parseExcelUpload, generateTemplate } from '../services/excelImportService.js';
 import { validateUpload } from '../services/validationService.js';
@@ -165,66 +165,52 @@ router.post('/reports/:id/upload', upload.single('file'), async (req: AuthReques
         validDisciplines
       );
 
-      // Store report activities (even if there are warnings, but not errors)
+      // Store report activities using PostgreSQL-compatible queries
       if (validationResult.errors.length === 0) {
-          
-        await new Promise<void>(async (resolve, reject) => {
-            const db = getDb();
-            try {
-                // We need baseline details
-                const baselineDetails = await dbAll<{
-                    id: number; wbs: string; name: string; discipline_code: string;
-                    planned_start: string; planned_finish: string; planned_duration: number;
-                    is_critical: number; float_days: number;
-                }>(`
-                    SELECT ba.*, d.code as discipline_code
-                    FROM baseline_activities ba
-                    JOIN disciplines d ON d.id = ba.discipline_id
-                    WHERE ba.project_id = ?
-                `, [report.project_id]);
-                
-                const baselineMap = new Map<string, number>(baselineDetails.map(b => [b.wbs, b.id]));
-                const baselineDetailMap = new Map(baselineDetails.map(b => [b.wbs, b]));
+        // Get baseline details
+        const baselineDetails = await dbAll<{
+          id: number; wbs: string; name: string; discipline_code: string;
+          planned_start: string; planned_finish: string; planned_duration: number;
+          is_critical: number; float_days: number;
+        }>(`
+          SELECT ba.*, d.code as discipline_code
+          FROM baseline_activities ba
+          JOIN disciplines d ON d.id = ba.discipline_id
+          WHERE ba.project_id = ?
+        `, [report.project_id]);
 
-                db.serialize(() => {
-                    db.run('BEGIN TRANSACTION');
-                    db.run('DELETE FROM report_activities WHERE report_id = ?', [reportId]);
-                    
-                    const stmt = db.prepare(`
-                        INSERT INTO report_activities 
-                        (report_id, baseline_activity_id, wbs, activity_name, discipline_code,
-                        planned_start, planned_finish, planned_duration, progress_pct, status, is_critical, float_days, remarks)
-                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                    `);
+        const baselineMap = new Map<string, number>(baselineDetails.map(b => [b.wbs, b.id]));
+        const baselineDetailMap = new Map(baselineDetails.map(b => [b.wbs, b]));
 
-                    for (const a of parseResult.activities) {
-                        const baselineId = baselineMap.get(a.wbs) || 0;
-                        const baseline = baselineDetailMap.get(a.wbs);
-                        
-                        stmt.run(
-                        reportId,
-                        baselineId,
-                        a.wbs,
-                        baseline?.name || a.activity_name,
-                        baseline?.discipline_code || a.discipline_code,
-                        baseline?.planned_start || a.planned_start,
-                        baseline?.planned_finish || a.planned_finish,
-                        baseline?.planned_duration || a.planned_duration,
-                        a.progress_pct,
-                        a.status,
-                        baseline?.is_critical || 0,
-                        baseline?.float_days || 0,
-                        a.remarks
-                        );
-                    }
-                    stmt.finalize();
-                    db.run('COMMIT', () => resolve());
-                });
-            } catch(e) {
-                db.run('ROLLBACK');
-                reject(e);
-            }
-        });
+        // Delete existing activities for this report
+        await dbRun('DELETE FROM report_activities WHERE report_id = ?', [reportId]);
+
+        // Insert new activities
+        for (const a of parseResult.activities) {
+          const baselineId = baselineMap.get(a.wbs) || 0;
+          const baseline = baselineDetailMap.get(a.wbs);
+
+          await dbRun(`
+            INSERT INTO report_activities 
+            (report_id, baseline_activity_id, wbs, activity_name, discipline_code,
+            planned_start, planned_finish, planned_duration, progress_pct, status, is_critical, float_days, remarks)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          `, [
+            reportId,
+            baselineId,
+            a.wbs,
+            baseline?.name || a.activity_name,
+            baseline?.discipline_code || a.discipline_code,
+            baseline?.planned_start || a.planned_start,
+            baseline?.planned_finish || a.planned_finish,
+            baseline?.planned_duration || a.planned_duration,
+            a.progress_pct,
+            a.status,
+            baseline?.is_critical || 0,
+            baseline?.float_days || 0,
+            a.remarks
+          ]);
+        }
 
         // Update report metadata
         const newStatus = validationResult.warnings.length > 0 ? 'draft' : 'validated';

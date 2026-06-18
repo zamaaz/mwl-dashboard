@@ -1,0 +1,12 @@
+{
+  "name": "project-dashboard",
+  "private": true,
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "build": "cd frontend && npm install && npm run build",
+    "install:backend": "cd backend && npm install",
+    "dev": "cd backend && npm run dev"
+  }
+}
