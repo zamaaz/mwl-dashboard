@@ -55,7 +55,7 @@ export function parseExcelUpload(fileBuffer: Buffer): ParseResult {
   let headerRowIdx = -1;
   let headers: string[] = [];
   for (let i = 0; i < Math.min(rawData.length, 10); i++) {
-    const row = rawData[i] as unknown[];
+    const row = (rawData[i] as unknown) as unknown[];
     const rowStrs = row.map(cell => String(cell || '').trim().toLowerCase());
     if (rowStrs.some(s => s === 'wbs' || s.includes('activity name') || s.includes('activity'))) {
       headerRowIdx = i;
@@ -95,7 +95,7 @@ export function parseExcelUpload(fileBuffer: Buffer): ParseResult {
   // Parse data rows
   const activities: ParsedActivity[] = [];
   for (let i = headerRowIdx + 1; i < rawData.length; i++) {
-    const row = rawData[i] as unknown[];
+    const row = (rawData[i] as unknown) as unknown[];
     if (!row || row.length === 0) continue;
 
     const wbs = String(row[colMap.wbs] || '').trim();

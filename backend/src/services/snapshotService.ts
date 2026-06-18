@@ -261,66 +261,45 @@ export async function createSnapshot(reportId: number): Promise<SnapshotData> {
  * Saves the snapshot to the database.
  */
 export async function saveSnapshot(reportId: number, snapshot: SnapshotData): Promise<void> {
-  await new Promise<void>((resolve, reject) => {
-    const db = getDb();
-    db.serialize(async () => {
-        try {
-            db.run('BEGIN TRANSACTION');
+  // Delete existing KPIs and disciplines for this report
+  await dbRun('DELETE FROM report_kpis WHERE report_id = ?', [reportId]);
+  await dbRun('DELETE FROM report_disciplines WHERE report_id = ?', [reportId]);
 
-            // Delete existing KPIs and disciplines for this report (in case of re-computation)
-            db.run('DELETE FROM report_kpis WHERE report_id = ?', [reportId]);
-            db.run('DELETE FROM report_disciplines WHERE report_id = ?', [reportId]);
+  // Insert KPIs
+  for (const [key, kpi] of Object.entries(snapshot.kpis)) {
+    await dbRun(`
+      INSERT INTO report_kpis (report_id, kpi_key, kpi_value, kpi_display, severity, description)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `, [reportId, key, kpi.value, kpi.display, kpi.severity, kpi.description]);
+  }
 
-            // Insert KPIs
-            const kpiStmt = db.prepare(`
-                INSERT INTO report_kpis (report_id, kpi_key, kpi_value, kpi_display, severity, description)
-                VALUES (?, ?, ?, ?, ?, ?)
-            `);
-            for (const [key, kpi] of Object.entries(snapshot.kpis)) {
-                kpiStmt.run(reportId, key, kpi.value, kpi.display, kpi.severity, kpi.description);
-            }
-            kpiStmt.finalize();
+  // Insert discipline results
+  const disciplines = await dbAll<{ id: number; code: string }>(
+    'SELECT id, code FROM disciplines WHERE project_id = (SELECT project_id FROM reports WHERE id = ?)',
+    [reportId]
+  );
+  
+  const discIdMap = new Map(disciplines.map(d => [d.code, d.id]));
 
-            // Insert discipline results
-            db.all(
-                'SELECT id, code FROM disciplines WHERE project_id = (SELECT project_id FROM reports WHERE id = ?)',
-                [reportId],
-                (err, disciplines: Array<{ id: number; code: string }>) => {
-                    if (err) return reject(err);
+  for (const d of snapshot.disciplines) {
+    const discId = discIdMap.get(d.code) || 0;
+    await dbRun(`
+      INSERT INTO report_disciplines 
+      (report_id, discipline_id, discipline_name, discipline_code, progress_pct,
+      total_activities, completed_activities, in_progress_activities, not_started_activities, status_label)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `, [reportId, discId, d.name, d.code, d.progress_pct, d.total, d.completed, d.in_progress, d.not_started, d.status_label]);
+  }
 
-                    const discIdMap = new Map(disciplines.map(d => [d.code, d.id]));
-                    const discStmt = db.prepare(`
-                        INSERT INTO report_disciplines 
-                        (report_id, discipline_id, discipline_name, discipline_code, progress_pct,
-                        total_activities, completed_activities, in_progress_activities, not_started_activities, status_label)
-                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                    `);
+  // Save/update snapshot
+  await dbRun('DELETE FROM report_snapshots WHERE report_id = ?', [reportId]);
+  await dbRun(`
+      INSERT INTO report_snapshots (report_id, full_snapshot, snapshot_version, frozen_at)
+      VALUES (?, ?, '1.0', NOW())
+  `, [reportId, JSON.stringify(snapshot)]);
 
-                    for (const d of snapshot.disciplines) {
-                        const discId = discIdMap.get(d.code) || 0;
-                        discStmt.run(reportId, discId, d.name, d.code, d.progress_pct, d.total, d.completed, d.in_progress, d.not_started, d.status_label);
-                    }
-                    discStmt.finalize();
-
-                    // Save/update snapshot
-                    db.run('DELETE FROM report_snapshots WHERE report_id = ?', [reportId]);
-                    db.run(`
-                        INSERT INTO report_snapshots (report_id, full_snapshot, snapshot_version, frozen_at)
-                        VALUES (?, ?, '1.0', NOW())
-                    `, [reportId, JSON.stringify(snapshot)]);
-
-                    // Update computed_kpis on report
-                    db.run('UPDATE reports SET computed_kpis = ? WHERE id = ?', [JSON.stringify(snapshot.kpis), reportId]);
-
-                    db.run('COMMIT', () => resolve());
-                }
-            );
-        } catch(e) {
-            db.run('ROLLBACK');
-            reject(e);
-        }
-    });
-  });
+  // Update computed_kpis on report
+  await dbRun('UPDATE reports SET computed_kpis = ? WHERE id = ?', [JSON.stringify(snapshot.kpis), reportId]);
 }
 
 /**

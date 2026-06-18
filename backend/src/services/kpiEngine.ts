@@ -1,4 +1,4 @@
-import { getDb } from '../database.js';
+import { dbAll } from '../database.js';
 
 interface Activity {
   wbs: string;
@@ -186,14 +186,10 @@ export async function computeDisciplineProgress(
   reportDate: string,
   projectId: number
 ): Promise<DisciplineResult[]> {
-  const db = getDb();
-  // Using a promise wrapper for sqlite3 async behavior
-  const disciplines = await new Promise<Array<{ id: number; name: string; code: string; wbs_prefix: string; sort_order: number; }>>((resolve, reject) => {
-    db.all('SELECT * FROM disciplines WHERE project_id = ? ORDER BY sort_order', [projectId], (err, rows) => {
-      if (err) reject(err);
-      else resolve(rows as any);
-    });
-  });
+  const disciplines = await dbAll<{ id: number; name: string; code: string; wbs_prefix: string; sort_order: number; }>(
+    'SELECT * FROM disciplines WHERE project_id = ? ORDER BY sort_order',
+    [projectId]
+  );
 
   const reportDt = new Date(reportDate);
   const results: DisciplineResult[] = [];
