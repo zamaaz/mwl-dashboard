@@ -21,7 +21,7 @@ interface SCurveChartProps {
   reportDate: string;
 }
 
-export const SCurveChart: React.FC<SCurveChartProps> = ({ data, reportDate }) => {
+export const SCurveChart: React.FC<SCurveChartProps> = ({ data, reportDate: _reportDate }) => {
   if (!data || !data.labels) return <div className="text-muted-foreground text-sm">No S-Curve data available</div>;
 
   const chartData = data.labels.map((label, index) => ({

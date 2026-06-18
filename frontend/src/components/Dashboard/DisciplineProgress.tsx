@@ -15,7 +15,7 @@ interface DisciplineProgressProps {
   disciplines: DisciplineData[];
 }
 
-const getBarColor = (pct: number, statusLabel: string) => {
+const getBarColor = (pct: number, _statusLabel: string) => {
   if (pct >= 80) return 'bg-[#276749]';
   if (pct >= 40) return 'bg-[#B7791F]';
   if (pct > 0) return 'bg-[#C53030]';
