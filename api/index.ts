@@ -1,30 +1,24 @@
-import type { Request, Response } from 'express';
-import dotenv from 'dotenv';
+// Vercel Serverless Function Entry Point
+// Env vars are injected by Vercel — no dotenv needed
 
-// Load environment variables
-dotenv.config({ path: '../backend/.env' });
+import { runMigrations } from '../backend/src/migrate.js';
 
-// Lazy-load app to avoid import issues
-let appPromise: Promise<any> | null = null;
-let initialized = false;
+let migrationsDone = false;
 
-async function getApp() {
-  if (!appPromise) {
-    appPromise = (async () => {
-      // Run migrations on first cold start
-      const { runMigrations } = await import('../backend/src/migrate.js');
+export default async function handler(req: any, res: any) {
+  // Run migrations once per cold start
+  if (!migrationsDone) {
+    try {
       await runMigrations();
-
-      // Import the configured Express app
-      const { default: app } = await import('../backend/src/server.js');
-      initialized = true;
-      return app;
-    })();
+      migrationsDone = true;
+    } catch (err) {
+      console.error('Migration error:', err);
+      // Continue anyway — tables may already exist
+      migrationsDone = true;
+    }
   }
-  return appPromise;
-}
 
-export default async function handler(req: Request, res: Response) {
-  const app = await getApp();
+  // Dynamically import the app after migrations
+  const { default: app } = await import('../backend/src/server.js');
   return app(req, res);
 }
