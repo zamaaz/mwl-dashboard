@@ -2,6 +2,7 @@
 // Env vars are injected by Vercel — no dotenv needed
 
 import { runMigrations } from '../backend/src/migrate.js';
+import app from '../backend/src/server.js';
 
 let migrationsDone = false;
 
@@ -18,7 +19,5 @@ export default async function handler(req: any, res: any) {
     }
   }
 
-  // Dynamically import the app after migrations
-  const { default: app } = await import('../backend/src/server.js');
   return app(req, res);
 }
